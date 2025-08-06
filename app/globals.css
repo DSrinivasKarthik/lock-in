@@ -40,13 +40,13 @@ body {
     "CRSV" 0.5,
     "ELSH" 0,
     "ELXP" 0;
-      /* 🔥 Glow effect */
+  /* Default fallback if JS not loaded */
   text-shadow:
-    0 0 4px rgba(0, 255, 0, 0.7),   /* inner green glow */
-    0 0 10px rgba(0, 255, 0, 0.5),  /* mid green glow */
-    0 0 20px rgba(0, 255, 0, 0.3);  /* outer green glow */
-  color: #00ff88; /* Optional: neon green text */
-
+    0 0 4px rgba(0, 255, 0, 0.7),
+    0 0 10px rgba(0, 255, 0, 0.5),
+    0 0 20px rgba(0, 255, 0, 0.3);
+  color: #00ff88;
 }
+
 
 

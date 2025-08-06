@@ -5,7 +5,8 @@ import { Play, Pause, SkipForward, SkipBack, Volume2, Settings, Plus, Check, Vol
 import './globals.css'; 
 import Clock from './components/Clock'; 
 import FocusTimer from './components/FocusTimer';
-// Main App Component (which will serve as the page component)
+import { colors, accentColorMap, getAccentHex } from './utils/colors';
+
 const App: React.FC = () => {
   // State for the accent color
   const [accentColor, setAccentColor] = useState<string>('text-green-400'); // Default neon green
@@ -20,17 +21,6 @@ const App: React.FC = () => {
 
   // State for displaying temporary messages (replaces alert())
   const [message, setMessage] = useState<string>('');
-
-  // Accent color options
-  const colors = [
-    { name: 'Green', class: 'text-green-400', bg: 'bg-green-400' },
-    { name: 'Red', class: 'text-red-400', bg: 'bg-red-400' },
-    { name: 'Blue', class: 'text-blue-400', bg: 'bg-blue-400' },
-    { name: 'Yellow', class: 'text-yellow-400', bg: 'bg-yellow-400' },
-    { name: 'Cyan', class: 'text-cyan-400', bg: 'bg-cyan-400' },
-    { name: 'Magenta', class: 'text-fuchsia-400', bg: 'bg-fuchsia-400' },
-    { name: 'White', class: 'text-white', bg: 'bg-white' },
-  ];
 
   // Function to display temporary messages
   const showMessage = (msg: string) => {
@@ -199,7 +189,20 @@ const App: React.FC = () => {
 
     {/* Footer Branding */}
     <div className={`mt-8 sm:mt-12 text-center text-lg sm:text-xl ${accentColor}`}>
-      Developed by <span className="bitcount-single-title">DSK</span>
+      Developed by <div
+  className="bitcount-single-title"
+  style={{
+    color: getAccentHex(accentColor),
+    textShadow: `
+      0 0 4px ${getAccentHex(accentColor)},
+      0 0 10px ${getAccentHex(accentColor)}80,
+      0 0 20px ${getAccentHex(accentColor)}60
+    `,
+  }}
+>
+  DSK
+</div>
+
     </div>
     </div>
   );
