@@ -2,18 +2,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipForward, SkipBack, Volume2, Settings, Plus, Check, VolumeX, Volume1 } from 'lucide-react';
-import './globals.css'; // Import global styles
-import Clock from './components/Clock'; // Import the Clock component
-
+import './globals.css'; 
+import Clock from './components/Clock'; 
+import FocusTimer from './components/FocusTimer';
 // Main App Component (which will serve as the page component)
 const App: React.FC = () => {
   // State for the accent color
   const [accentColor, setAccentColor] = useState<string>('text-green-400'); // Default neon green
-
-  // State for focus timer
-  const [focusTime, setFocusTime] = useState<number>(50 * 60); // 50 minutes in seconds
-  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // State for music panel
   const [youtubeUrl, setYoutubeUrl] = useState<string>('');
@@ -43,50 +38,6 @@ const App: React.FC = () => {
     setTimeout(() => {
       setMessage('');
     }, 3000); // Message disappears after 3 seconds
-  };
-
-  // Effect for focus timer
-  useEffect(() => {
-    if (isTimerRunning && focusTime > 0) {
-      timerIntervalRef.current = setInterval(() => {
-        setFocusTime((prevTime) => prevTime - 1);
-      }, 1000);
-    }
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-    };
-  }, [isTimerRunning]);
-
-  useEffect(() => {
-    if (focusTime === 0) {
-      setIsTimerRunning(false);
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-      showMessage('Focus session complete!'); // Using showMessage instead of alert
-    }
-  }, [focusTime]);
-
-  // Format timer display (MM:SS)
-  const formatTimer = (seconds: number) => {
-    const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
-    const remainingSeconds = String(seconds % 60).padStart(2, '0');
-    return `${minutes}:${remainingSeconds}`;
-  };
-
-  // Timer controls
-  const toggleTimer = () => {
-    setIsTimerRunning((prev) => !prev);
-  };
-
-  const resetTimer = () => {
-    setIsTimerRunning(false);
-    setFocusTime(50 * 60); // Reset to 50 minutes
-    showMessage('Timer reset to 50 minutes.');
   };
 
   // Music controls (placeholder functions)
@@ -165,31 +116,10 @@ const App: React.FC = () => {
         <Clock accentColor={accentColor} />
 
         {/* Focus Timer Panel (below clock) */}
-        <div className="col-span-1 md:col-span-full p-4 sm:p-6 border-2 rounded-xl border-gray-700 flex flex-col justify-between min-h-[150px] sm:min-h-[200px]">
-          <div className="flex-grow flex flex-col items-center justify-center">
-            <div className={`text-5xl sm:text-7xl font-bold ${accentColor}`}>
-              {formatTimer(focusTime)}
-            </div>
-            <div className={`text-lg sm:text-xl mt-2 ${accentColor}`}>FOCUS</div>
-          </div>
-          <div className="flex justify-center space-x-2 sm:space-x-4 mt-4">
-            <IconButton onClick={() => showMessage('Skip back not implemented for timer.')} className="opacity-50 cursor-not-allowed">
-              <SkipBack className="w-5 h-5 sm:w-6 sm:h-6" />
-            </IconButton>
-            <IconButton onClick={toggleTimer}>
-              {isTimerRunning ? <Pause className="w-5 h-5 sm:w-6 sm:h-6" /> : <Play className="w-5 h-5 sm:w-6 sm:h-6" />}
-            </IconButton>
-            <IconButton onClick={() => showMessage('Skip forward not implemented for timer.')} className="opacity-50 cursor-not-allowed">
-              <SkipForward className="w-5 h-5 sm:w-6 sm:h-6" />
-            </IconButton>
-            <IconButton onClick={() => showMessage('Volume control not implemented.')}>
-              <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />
-            </IconButton>
-            <IconButton onClick={() => showMessage('Settings not implemented.')}>
-              <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
-            </IconButton>
-          </div>
-        </div>
+        <FocusTimer
+          accentColor={accentColor}
+          showMessage={showMessage}
+          IconButton={IconButton} />
 
         {/* Music and Tasks Panels (side-by-side on md+, stacked on mobile) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 col-span-1 md:col-span-full">
