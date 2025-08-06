@@ -3,14 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipForward, SkipBack, Volume2, Settings, Plus, Check, VolumeX, Volume1 } from 'lucide-react';
 import './globals.css'; // Import global styles
+import Clock from './components/Clock'; // Import the Clock component
 
 // Main App Component (which will serve as the page component)
 const App: React.FC = () => {
   // State for the accent color
   const [accentColor, setAccentColor] = useState<string>('text-green-400'); // Default neon green
-
-  // State for clock and date
-  const [currentTime, setCurrentTime] = useState<Date>(new Date());
 
   // State for focus timer
   const [focusTime, setFocusTime] = useState<number>(50 * 60); // 50 minutes in seconds
@@ -47,14 +45,6 @@ const App: React.FC = () => {
     }, 3000); // Message disappears after 3 seconds
   };
 
-  // Effect for updating clock
-  useEffect(() => {
-    const clockInterval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(clockInterval);
-  }, []);
-
   // Effect for focus timer
   useEffect(() => {
     if (isTimerRunning && focusTime > 0) {
@@ -80,25 +70,6 @@ const App: React.FC = () => {
       showMessage('Focus session complete!'); // Using showMessage instead of alert
     }
   }, [focusTime]);
-
-  // Format time for display (HH:MM:SS)
-  const formatTime = (date: Date) => {
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${hours}:${minutes}:${seconds}`;
-  };
-
-  // Format date for display
-  const formatDate = (date: Date) => {
-    const formatter = new Intl.DateTimeFormat('en-IN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long',
-    });
-    return formatter.format(date);
-  };
 
   // Format timer display (MM:SS)
   const formatTimer = (seconds: number) => {
@@ -191,14 +162,7 @@ const App: React.FC = () => {
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 gap-4 sm:gap-8 w-full max-w-6xl mt-16 md:mt-0">
         {/* Center - Clock and Date (now top-center) */}
-        <div className="col-span-1 md:col-span-full flex flex-col items-center justify-center py-4 sm:py-8">
-          <div className={`text-7xl sm:text-9xl font-bold ${accentColor}`}>
-            {formatTime(currentTime)}
-          </div>
-          <div className={`text-xl sm:text-2xl mt-2 sm:mt-4 ${accentColor}`}>
-            {formatDate(currentTime)}
-          </div>
-        </div>
+        <Clock accentColor={accentColor} />
 
         {/* Focus Timer Panel (below clock) */}
         <div className="col-span-1 md:col-span-full p-4 sm:p-6 border-2 rounded-xl border-gray-700 flex flex-col justify-between min-h-[150px] sm:min-h-[200px]">
