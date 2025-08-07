@@ -464,6 +464,108 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
   };
 
   return (
+    <>
+      <style jsx>{`
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(107, 114, 128, 0.6) transparent;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(55, 65, 81, 0.3);
+          border-radius: 3px;
+          margin: 4px 0;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(107, 114, 128, 0.6);
+          border-radius: 3px;
+          transition: background 0.2s ease;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(156, 163, 175, 0.8);
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-corner {
+          background: transparent;
+        }
+        
+        /* Dynamic accent color for scrollbar */
+        .custom-scrollbar.text-green-400::-webkit-scrollbar-thumb {
+          background: rgba(74, 222, 128, 0.4);
+        }
+        .custom-scrollbar.text-green-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(74, 222, 128, 0.6);
+        }
+        
+        .custom-scrollbar.text-blue-400::-webkit-scrollbar-thumb {
+          background: rgba(96, 165, 250, 0.4);
+        }
+        .custom-scrollbar.text-blue-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(96, 165, 250, 0.6);
+        }
+        
+        .custom-scrollbar.text-purple-400::-webkit-scrollbar-thumb {
+          background: rgba(196, 181, 253, 0.4);
+        }
+        .custom-scrollbar.text-purple-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(196, 181, 253, 0.6);
+        }
+        
+        .custom-scrollbar.text-pink-400::-webkit-scrollbar-thumb {
+          background: rgba(244, 114, 182, 0.4);
+        }
+        .custom-scrollbar.text-pink-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(244, 114, 182, 0.6);
+        }
+        
+        .custom-scrollbar.text-red-400::-webkit-scrollbar-thumb {
+          background: rgba(248, 113, 113, 0.4);
+        }
+        .custom-scrollbar.text-red-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(248, 113, 113, 0.6);
+        }
+        
+        .custom-scrollbar.text-yellow-400::-webkit-scrollbar-thumb {
+          background: rgba(251, 191, 36, 0.4);
+        }
+        .custom-scrollbar.text-yellow-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(251, 191, 36, 0.6);
+        }
+        
+        .custom-scrollbar.text-orange-400::-webkit-scrollbar-thumb {
+          background: rgba(251, 146, 60, 0.4);
+        }
+        .custom-scrollbar.text-orange-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(251, 146, 60, 0.6);
+        }
+        
+        .custom-scrollbar.text-cyan-400::-webkit-scrollbar-thumb {
+          background: rgba(34, 211, 238, 0.4);
+        }
+        .custom-scrollbar.text-cyan-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(34, 211, 238, 0.6);
+        }
+        
+        .custom-scrollbar.text-indigo-400::-webkit-scrollbar-thumb {
+          background: rgba(129, 140, 248, 0.4);
+        }
+        .custom-scrollbar.text-indigo-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(129, 140, 248, 0.6);
+        }
+        
+        .custom-scrollbar.text-emerald-400::-webkit-scrollbar-thumb {
+          background: rgba(52, 211, 153, 0.4);
+        }
+        .custom-scrollbar.text-emerald-400::-webkit-scrollbar-thumb:hover {
+          background: rgba(52, 211, 153, 0.6);
+        }
+      `}</style>
     <div className="p-4 sm:p-6 border-2 rounded-xl border-gray-700 flex flex-col justify-between min-h-[400px]">
       {/* Add Track */}
       <div className="flex items-center space-x-2 mb-3">
@@ -527,7 +629,7 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
       {/* Playlist */}
       <div className="flex-1 mb-4">
         <div className="text-xs text-gray-500 mb-2 font-mono">PLAYLIST ({playlist.length})</div>
-        <div className="space-y-1 text-sm text-gray-300 max-h-32 overflow-y-auto">
+        <div className={`space-y-1 text-sm text-gray-300 max-h-32 overflow-y-auto custom-scrollbar ${accentColor}`}>
           {playlist.length === 0 ? (
             <p className="text-gray-500 italic text-center py-4">No tracks added.</p>
           ) : (
@@ -684,6 +786,7 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 
