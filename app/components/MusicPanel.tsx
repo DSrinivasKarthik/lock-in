@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Plus, Play, Pause, SkipBack, SkipForward, Volume1, Eye, EyeOff, Trash
+  Plus, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Eye, EyeOff, 
+  Trash, Shuffle, Repeat, Heart, Clock
 } from 'lucide-react';
 
 interface MusicPanelProps {
@@ -20,6 +21,8 @@ interface Track {
   id: string;
   title: string;
   loading?: boolean;
+  duration?: string;
+  liked?: boolean;
 }
 
 const isValidYouTubeUrl = (url: string): boolean => {
@@ -68,9 +71,110 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
   const [showVideo, setShowVideo] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
+  const [volume, setVolume] = useState(70);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isShuffled, setIsShuffled] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isAddingTrack, setIsAddingTrack] = useState(false);
   
   const playerRef = useRef<any>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const volumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Enhanced tab volume control that actually works
+  const applyTabVolume = useCallback(() => {
+    const actualVolume = isMuted ? 0 : volume / 100;
+    
+    // Clear any existing timeout
+    if (volumeTimeoutRef.current) {
+      clearTimeout(volumeTimeoutRef.current);
+    }
+    
+    // Apply volume with retry mechanism
+    const applyVolumeToElements = () => {
+      // Get all video and audio elements
+      const mediaElements = [
+        ...document.querySelectorAll('video'),
+        ...document.querySelectorAll('audio'),
+        ...document.querySelectorAll('iframe[src*="youtube"]')
+      ];
+      
+      mediaElements.forEach((element: any) => {
+        if (element.tagName === 'IFRAME') {
+          // For YouTube iframes, we'll use postMessage
+          try {
+            element.contentWindow?.postMessage(
+              `{"event":"command","func":"setVolume","args":[${actualVolume * 100}]}`,
+              '*'
+            );
+          } catch (e) {
+            // Fallback: try to find video elements inside iframe
+            const videos = element.contentDocument?.querySelectorAll('video') || [];
+            videos.forEach((video: any) => {
+              if (video && typeof video.volume !== 'undefined') {
+                video.volume = actualVolume;
+              }
+            });
+          }
+        } else if (element && typeof element.volume !== 'undefined') {
+          element.volume = actualVolume;
+          element.muted = isMuted;
+        }
+      });
+    };
+
+    // Apply immediately
+    applyVolumeToElements();
+    
+    // Also apply after a short delay to catch dynamically created elements
+    volumeTimeoutRef.current = setTimeout(applyVolumeToElements, 100);
+    
+    // Also use YouTube API if available
+    if (playerRef.current && typeof playerRef.current.setVolume === 'function') {
+      try {
+        if (isMuted) {
+          playerRef.current.mute();
+        } else {
+          playerRef.current.unMute();
+          playerRef.current.setVolume(volume);
+        }
+      } catch (e) {
+        console.log('YouTube API volume control not available');
+      }
+    }
+  }, [volume, isMuted]);
+
+  // Apply volume changes
+  useEffect(() => {
+    applyTabVolume();
+  }, [applyTabVolume]);
+
+  // Progress tracking with better error handling
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (playerRef.current && isPlaying && !isAddingTrack) {
+        try {
+          const current = playerRef.current.getCurrentTime();
+          const total = playerRef.current.getDuration();
+          
+          if (!isNaN(current) && !isNaN(total) && total > 0) {
+            setCurrentTime(current);
+            setDuration(total);
+            setProgress((current / total) * 100);
+          }
+        } catch (e) {
+          // Handle errors silently
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, isAddingTrack]);
 
   // Load YouTube API
   useEffect(() => {
@@ -86,43 +190,79 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
     } else {
       setPlayerReady(true);
     }
+
+    return () => {
+      if (volumeTimeoutRef.current) {
+        clearTimeout(volumeTimeoutRef.current);
+      }
+    };
   }, []);
 
-  // Initialize player when ready and track available
+  // Initialize player - FIXED: Only when track changes, not when playlist changes
   useEffect(() => {
-    if (playerReady && currentTrack !== null && playlist[currentTrack] && playerContainerRef.current) {
-      if (playerRef.current) {
-        playerRef.current.destroy();
-      }
-
-      playerRef.current = new (window as any).YT.Player(playerContainerRef.current, {
-        height: '100%',
-        width: '100%',
-        videoId: playlist[currentTrack].id,
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          modestbranding: 1,
-          rel: 0,
-          showinfo: 0
-        },
-        events: {
-          onReady: (event: any) => {
-            setIsPlaying(true);
-          },
-          onStateChange: (event: any) => {
-            const YT = (window as any).YT;
-            if (event.data === YT.PlayerState.ENDED) {
-              handleNext();
-            }
-            setIsPlaying(event.data === YT.PlayerState.PLAYING);
-          }
+    if (playerReady && currentTrack !== null && playlist[currentTrack] && playerContainerRef.current && !isAddingTrack) {
+      // Only destroy and recreate if we're switching to a different video
+      const currentVideoId = playerRef.current?.getVideoData?.()?.video_id;
+      const newVideoId = playlist[currentTrack].id;
+      
+      if (currentVideoId !== newVideoId) {
+        if (playerRef.current) {
+          playerRef.current.destroy();
         }
-      });
+
+        playerRef.current = new (window as any).YT.Player(playerContainerRef.current, {
+          height: '100%',
+          width: '100%',
+          videoId: newVideoId,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            modestbranding: 1,
+            rel: 0,
+            showinfo: 0,
+            iv_load_policy: 3
+          },
+          events: {
+            onReady: (event: any) => {
+              setIsPlaying(true);
+              applyTabVolume();
+              // Set video visibility
+              if (!showVideo) {
+                event.target.getIframe().style.opacity = '0';
+              }
+            },
+            onStateChange: (event: any) => {
+              const YT = (window as any).YT;
+              if (event.data === YT.PlayerState.ENDED) {
+                handleNext();
+              }
+              setIsPlaying(event.data === YT.PlayerState.PLAYING);
+            }
+          }
+        });
+      }
     }
-  }, [playerReady, currentTrack, playlist]);
+  }, [playerReady, currentTrack, playlist.length, isAddingTrack]); // Removed playlist dependency
+
+  // Handle video visibility - FIXED
+  useEffect(() => {
+    if (playerRef.current && playerRef.current.getIframe) {
+      const iframe = playerRef.current.getIframe();
+      if (iframe) {
+        if (showVideo) {
+          iframe.style.opacity = '1';
+          iframe.style.pointerEvents = 'auto';
+        } else {
+          iframe.style.opacity = '0';
+          iframe.style.pointerEvents = 'none';
+        }
+      }
+    }
+  }, [showVideo]);
 
   const handleAddTrack = async () => {
+    if (isAddingTrack) return; // Prevent multiple simultaneous additions
+    
     if (!isValidYouTubeUrl(youtubeUrl)) {
       setError('Please enter a valid YouTube URL.');
       showMessage('Please enter a valid YouTube URL.');
@@ -142,7 +282,8 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
       return;
     }
 
-    // Add track with loading state
+    setIsAddingTrack(true);
+    
     const newTrack: Track = {
       url: youtubeUrl,
       id,
@@ -150,17 +291,17 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
       loading: true
     };
 
+    const newPlaylistLength = playlist.length;
     setPlaylist(prev => [...prev, newTrack]);
     setError('');
 
-    // If this is the first track, set it as current
+    // Only set as current track if no track is currently playing
     if (currentTrack === null) {
-      setCurrentTrack(playlist.length);
+      setCurrentTrack(newPlaylistLength);
     }
 
     showMessage('Track added to playlist!');
 
-    // Fetch the title
     try {
       const title = await fetchVideoTitle(id);
       setPlaylist(prev => 
@@ -178,9 +319,10 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
             : track
         )
       );
+    } finally {
+      setIsAddingTrack(false);
     }
 
-    // Clear the URL input
     setYoutubeUrl('');
   };
 
@@ -208,11 +350,8 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
   };
 
   const loadTrack = (index: number) => {
-    if (playlist[index]) {
+    if (playlist[index] && index !== currentTrack) {
       setCurrentTrack(index);
-      if (playerRef.current) {
-        playerRef.current.loadVideoById(playlist[index].id);
-      }
     }
   };
 
@@ -225,9 +364,17 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
   };
 
   const handleNext = () => {
+    if (repeatMode === 'one' && currentTrack !== null) {
+      if (playerRef.current) {
+        playerRef.current.seekTo(0);
+        playerRef.current.playVideo();
+      }
+      return;
+    }
+
     if (currentTrack !== null && currentTrack < playlist.length - 1) {
       loadTrack(currentTrack + 1);
-    } else if (playlist.length > 0) {
+    } else if (playlist.length > 0 && repeatMode === 'all') {
       loadTrack(0);
     }
   };
@@ -243,16 +390,81 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
   };
 
   const toggleVideo = () => {
-    setShowVideo(prev => !prev);
-    showMessage(showVideo ? 'Video hidden - audio only' : 'Video shown');
+    setShowVideo(prev => {
+      const newValue = !prev;
+      showMessage(newValue ? 'Video shown' : 'Video hidden - audio only');
+      return newValue;
+    });
   };
 
-  const handleTrackSelect = (index: number) => {
-    loadTrack(index);
+  const toggleMute = () => {
+    setIsMuted(prev => {
+      const newMuted = !prev;
+      showMessage(newMuted ? 'Muted' : 'Unmuted');
+      return newMuted;
+    });
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = parseInt(e.target.value);
+    setVolume(newVolume);
+    if (newVolume === 0 && !isMuted) {
+      setIsMuted(true);
+    } else if (newVolume > 0 && isMuted) {
+      setIsMuted(false);
+    }
+  };
+
+  const toggleRepeat = () => {
+    const modes: Array<'off' | 'all' | 'one'> = ['off', 'all', 'one'];
+    const current = modes.indexOf(repeatMode);
+    const next = modes[(current + 1) % modes.length];
+    setRepeatMode(next);
+    showMessage(
+      next === 'off' ? 'Repeat off' :
+      next === 'all' ? 'Repeat all' : 'Repeat one'
+    );
+  };
+
+  const toggleShuffle = () => {
+    setIsShuffled(prev => {
+      const newValue = !prev;
+      showMessage(newValue ? 'Shuffle on' : 'Shuffle off');
+      return newValue;
+    });
+  };
+
+  const toggleLike = (index: number) => {
+    setPlaylist(prev => 
+      prev.map((track, i) => 
+        i === index ? { ...track, liked: !track.liked } : track
+      )
+    );
+    const track = playlist[index];
+    if (track) {
+      showMessage(track.liked ? 'Removed from favorites' : 'Added to favorites');
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (progressRef.current && playerRef.current && duration) {
+      const rect = progressRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const percentage = clickX / rect.width;
+      const newTime = percentage * duration;
+      playerRef.current.seekTo(newTime);
+    }
   };
 
   return (
-    <div className="p-4 sm:p-6 border-2 rounded-xl border-gray-700 flex flex-col justify-between min-h-[300px]">
+    <div className="p-4 sm:p-6 border-2 rounded-xl border-gray-700 flex flex-col justify-between min-h-[400px]">
       {/* Add Track */}
       <div className="flex items-center space-x-2 mb-3">
         <input
@@ -261,117 +473,216 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
           value={youtubeUrl}
           onChange={(e) => setYoutubeUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAddTrack()}
-          className="flex-grow bg-transparent border-b-2 border-gray-600 focus:outline-none focus:border-current py-1 px-2 text-sm sm:text-base"
+          disabled={isAddingTrack}
+          className="flex-grow bg-transparent border-b-2 border-gray-600 focus:outline-none focus:border-current py-1 px-2 text-sm sm:text-base disabled:opacity-50"
         />
-        <IconButton onClick={handleAddTrack} className="p-1">
+        <IconButton onClick={handleAddTrack} className={`p-1 ${isAddingTrack ? 'opacity-50 cursor-not-allowed' : ''}`}>
           <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
         </IconButton>
       </div>
 
       {error && <p className="text-red-500 text-xs sm:text-sm mb-2">{error}</p>}
 
-      {/* Playlist */}
-      <div className="space-y-1 text-sm text-gray-300 max-h-40 overflow-y-auto mb-4 ">
-        {playlist.length === 0 ? (
-          <p className="text-gray-500 italic">No tracks added.</p>
-        ) : (
-          playlist.map((track, index) => (
-            <div
-              key={track.id}
-              className={`flex items-center justify-between px-2 py-1 rounded cursor-pointer ${
-                index === currentTrack 
-                  ? `bg-gray-800 ${accentColor}` 
-                  : 'hover:bg-gray-800'
-              }`}
-            >
+      {/* Current Track Info */}
+      {currentTrack !== null && playlist[currentTrack] && (
+        <div className="mb-3 p-3 border border-gray-700 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-500 font-mono">NOW PLAYING</p>
+            <div className="flex items-center space-x-1">
               <button
-  className="flex-grow text-left overflow-hidden"
-  onClick={() => handleTrackSelect(index)}
->
-  <div
-    className="truncate block w-full max-w-full font-medium"
-    title={track.title}
-  >
-    {track.loading ? 'Loading...' : track.title}
-  </div>
-
-  <div className="text-xs text-gray-500 truncate w-full max-w-full" title={track.id}>
-    {track.id}
-  </div>
-</button>
-
-              <button
-                onClick={() => handleRemoveTrack(index)}
-                className={`text-gray-600 hover:${accentColor.replace('text-', 'text-')} ml-2`}
+                onClick={() => toggleLike(currentTrack!)}
+                className={`p-1 rounded border-2 border-current transition-colors duration-200 ${
+                  playlist[currentTrack].liked ? `${accentColor} hover:bg-gray-800` : 'text-gray-600 hover:text-red-400'
+                }`}
               >
-                <Trash className="w-4 h-4" />
+                <Heart className={`w-3 h-3 ${playlist[currentTrack].liked ? 'fill-current' : ''}`} />
               </button>
             </div>
-          ))
-        )}
+          </div>
+          
+          <p className={`text-sm font-medium ${accentColor} break-words whitespace-normal mb-2`}>
+            {playlist[currentTrack].loading ? 'Loading...' : playlist[currentTrack].title}
+          </p>
+          
+          {/* Progress Bar */}
+          <div className="space-y-1">
+            <div 
+              ref={progressRef}
+              className="h-1 bg-gray-700 rounded-full cursor-pointer"
+              onClick={handleProgressClick}
+            >
+              <div 
+                className={`h-full ${accentColor.replace('text-', 'bg-')} rounded-full transition-all duration-200`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="flex justify-between items-center text-xs text-gray-500">
+              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(duration)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Playlist */}
+      <div className="flex-1 mb-4">
+        <div className="text-xs text-gray-500 mb-2 font-mono">PLAYLIST ({playlist.length})</div>
+        <div className="space-y-1 text-sm text-gray-300 max-h-32 overflow-y-auto">
+          {playlist.length === 0 ? (
+            <p className="text-gray-500 italic text-center py-4">No tracks added.</p>
+          ) : (
+            playlist.map((track, index) => (
+              <div
+                key={track.id}
+                className={`flex items-center justify-between px-2 py-1 rounded border transition-all duration-200 ${
+                  index === currentTrack 
+                    ? `border-current ${accentColor} bg-gray-900` 
+                    : 'border-transparent hover:border-gray-600 hover:bg-gray-900'
+                }`}
+              >
+                <button
+                  className="flex-grow text-left overflow-hidden"
+                  onClick={() => loadTrack(index)}
+                >
+                  <div
+                    className="truncate block w-full max-w-full font-medium text-xs"
+                    title={track.title}
+                  >
+                    {track.loading ? 'Loading...' : track.title}
+                  </div>
+                  <div className="text-xs text-gray-600 truncate w-full max-w-full" title={track.id}>
+                    {track.id}
+                  </div>
+                </button>
+
+                <div className="flex items-center space-x-1 ml-2">
+                  {track.liked && <Heart className="w-3 h-3 text-red-400 fill-current" />}
+                  <button
+                    onClick={() => handleRemoveTrack(index)}
+                    className="text-gray-600 hover:text-red-400 text-xs"
+                  >
+                    [x]
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Video Player */}
       {currentTrack !== null && playlist[currentTrack] && (
         <div className="mb-4">
-          {showVideo ? (
-            <div 
-              className="w-full rounded-md border border-gray-700 bg-black overflow-hidden"
-              style={{ aspectRatio: '16/9' }}
-            >
-              <div ref={playerContainerRef} className="w-full h-full"></div>
-            </div>
-          ) : (
-            <div 
-              className="w-full rounded-md border border-gray-700 bg-gray-800 flex items-center justify-center"
-              style={{ aspectRatio: '16/9' }}
-            >
-              <div className="text-center">
-                <div className={`text-2xl ${accentColor} mb-2`}>♪</div>
-                <p className={`text-sm ${accentColor}`}>Audio Only Mode</p>
-                <p className="text-xs text-gray-500">Video hidden, audio playing</p>
+          <div 
+            className="w-full rounded-md border border-gray-700 bg-black overflow-hidden relative"
+            style={{ aspectRatio: '16/9' }}
+          >
+            <div ref={playerContainerRef} className="w-full h-full"></div>
+            {!showVideo && (
+              <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
+                <div className="text-center">
+                  <div className={`text-2xl ${accentColor} mb-2 font-mono animate-pulse`}>♪</div>
+                  <p className={`text-sm ${accentColor} font-mono`}>AUDIO ONLY</p>
+                  <p className="text-xs text-gray-500">Video hidden</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
       {/* Controls */}
-      <div className="flex justify-center space-x-3 mt-2">
-        <IconButton onClick={handlePrev}>
-          <SkipBack className="w-5 h-5 sm:w-6 sm:h-6" />
-        </IconButton>
-        <IconButton onClick={togglePlayPause}>
-          {isPlaying ? (
-            <Pause className="w-5 h-5 sm:w-6 sm:h-6" />
-          ) : (
-            <Play className="w-5 h-5 sm:w-6 sm:h-6" />
-          )}
-        </IconButton>
-        <IconButton onClick={handleNext}>
-          <SkipForward className="w-5 h-5 sm:w-6 sm:h-6" />
-        </IconButton>
-        <IconButton onClick={() => showMessage('Volume control requires YouTube Premium API access')}>
-          <Volume1 className="w-5 h-5 sm:w-6 sm:h-6" />
-        </IconButton>
-        <IconButton onClick={toggleVideo}>
-          {showVideo ? (
-            <EyeOff className="w-5 h-5 sm:w-6 sm:h-6" />
-          ) : (
-            <Eye className="w-5 h-5 sm:w-6 sm:h-6" />
-          )}
-        </IconButton>
-      </div>
-
-      {/* Current Track Info */}
-      {currentTrack !== null && playlist[currentTrack] && (
-        <div className="mt-3 text-center">
-          <p className="text-xs text-gray-500">Now Playing</p>
-            <p className={`text-sm font-medium ${accentColor} break-words whitespace-normal`}>
-            {playlist[currentTrack].loading ? 'Loading...' : playlist[currentTrack].title}
-            </p>
+      <div className="space-y-3">
+        {/* Main Controls */}
+        <div className="flex justify-center items-center space-x-3">
+          <button
+            onClick={toggleShuffle}
+            className={`p-1 rounded-full border-2 border-current transition-colors duration-200 ${
+              isShuffled ? `${accentColor} bg-gray-800` : 'text-gray-600 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <Shuffle className="w-4 h-4" />
+          </button>
+          
+          <IconButton onClick={handlePrev} className="p-1">
+            <SkipBack className="w-5 h-5" />
+          </IconButton>
+          
+          <IconButton onClick={togglePlayPause} className="p-2">
+            {isPlaying ? (
+              <Pause className="w-6 h-6" />
+            ) : (
+              <Play className="w-6 h-6" />
+            )}
+          </IconButton>
+          
+          <IconButton onClick={handleNext} className="p-1">
+            <SkipForward className="w-5 h-5" />
+          </IconButton>
+          
+          <button
+            onClick={toggleRepeat}
+            className={`p-1 rounded-full border-2 border-current transition-colors duration-200 relative ${
+              repeatMode !== 'off' ? `${accentColor} bg-gray-800` : 'text-gray-600 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <Repeat className="w-4 h-4" />
+            {repeatMode === 'one' && (
+              <span className={`absolute -top-1 -right-1 w-3 h-3 ${accentColor.replace('text-', 'bg-')} rounded-full text-xs flex items-center justify-center text-black font-bold`}>
+                1
+              </span>
+            )}
+            {repeatMode === 'all' && (
+              <span className={`absolute -top-1 -right-1 w-2 h-2 ${accentColor.replace('text-', 'bg-')} rounded-full`} />
+            )}
+          </button>
         </div>
-      )}
+
+        {/* Secondary Controls */}
+        <div className="flex justify-center items-center space-x-3">
+          <div className="relative">
+            <button
+              onClick={() => setShowVolumeSlider(!showVolumeSlider)}
+              className={`p-1 rounded-full border-2 border-current transition-colors duration-200 ${
+                showVolumeSlider ? `${accentColor} bg-gray-800` : 'text-gray-600 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              {isMuted || volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+            
+            {showVolumeSlider && (
+              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 border border-gray-600 rounded-lg p-3 shadow-lg">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  className={`w-20 accent-current ${accentColor}`}
+                />
+                <div className={`text-xs text-center mt-1 ${accentColor} font-mono`}>
+                  {isMuted ? 0 : volume}%
+                </div>
+                <button
+                  onClick={toggleMute}
+                  className={`w-full mt-2 text-xs ${accentColor} hover:bg-gray-800 py-1 px-2 rounded`}
+                >
+                  {isMuted ? 'Unmute' : 'Mute'}
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <button
+            onClick={toggleVideo}
+            className={`p-1 rounded-full border-2 border-current transition-colors duration-200 ${
+              !showVideo ? `${accentColor} bg-gray-800` : 'text-gray-600 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            {showVideo ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
