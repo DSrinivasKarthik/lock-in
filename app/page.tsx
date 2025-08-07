@@ -6,6 +6,9 @@ import './globals.css';
 import Clock from './components/Clock'; 
 import FocusTimer from './components/FocusTimer';
 import { colors, accentColorMap, getAccentHex } from './utils/colors';
+import MusicPanel from './components/MusicPanel';
+
+// Define the props for the MusicPanel component
 
 const App: React.FC = () => {
   // State for the accent color
@@ -113,40 +116,16 @@ const App: React.FC = () => {
 
         {/* Music and Tasks Panels (side-by-side on md+, stacked on mobile) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 col-span-1 md:col-span-full">
-          {/* Bottom Left - Music Panel */}
-          <div className="p-4 sm:p-6 border-2 rounded-xl border-gray-700 flex flex-col justify-between min-h-[150px] sm:min-h-[200px]">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <input
-                  type="text"
-                  placeholder="Paste YouTube URL..."
-                  value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
-                  className="flex-grow bg-transparent border-b-2 border-gray-600 focus:outline-none focus:border-current py-1 px-2 text-sm sm:text-base"
-                />
-                <IconButton onClick={handleAddTrack} className="p-1">
-                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                </IconButton>
-              </div>
-              <div className={`text-xs sm:text-sm text-gray-400 ${accentColor}`}>
-                {trackInfo}
-              </div>
-            </div>
-            <div className="flex justify-center space-x-2 sm:space-x-4 mt-4">
-              <IconButton onClick={() => showMessage('Back not implemented for music.')}>
-                <SkipBack className="w-5 h-5 sm:w-6 sm:h-6" />
-              </IconButton>
-              <IconButton onClick={() => showMessage('Play/Pause not implemented for music.')}>
-                <Play className="w-5 h-5 sm:w-6 sm:h-6" />
-              </IconButton>
-              <IconButton onClick={() => showMessage('Skip not implemented for music.')}>
-                <SkipForward className="w-5 h-5 sm:w-6 sm:h-6" />
-              </IconButton>
-              <IconButton onClick={() => showMessage('Volume wheel not implemented.')}>
-                <Volume1 className="w-5 h-5 sm:w-6 sm:h-6" />
-              </IconButton>
-            </div>
-          </div>
+          <MusicPanel
+            youtubeUrl={youtubeUrl}
+            setYoutubeUrl={setYoutubeUrl}
+            trackInfo={trackInfo}
+            handleAddTrack={handleAddTrack}
+            showMessage={showMessage}
+            accentColor={accentColor}
+            IconButton={IconButton}
+          />
+
 
           {/* Bottom Right - Tasks Panel */}
           <div className="p-4 sm:p-6 border-2 rounded-xl border-gray-700 flex flex-col justify-between min-h-[150px] sm:min-h-[200px]">
