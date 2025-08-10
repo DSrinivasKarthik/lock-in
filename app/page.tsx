@@ -7,9 +7,7 @@ import Clock from './components/Clock';
 import FocusTimer from './components/FocusTimer';
 import { colors, accentColorMap, getAccentHex } from './utils/colors';
 import MusicPanel from './components/MusicPanel';
-
-// Define the props for the MusicPanel component
-
+import TaskPanel from './components/TaskPanel';
 const App: React.FC = () => {
   // State for the accent color
   const [accentColor, setAccentColor] = useState<string>('text-green-400'); // Default neon green
@@ -17,10 +15,6 @@ const App: React.FC = () => {
   // State for music panel
   const [youtubeUrl, setYoutubeUrl] = useState<string>('');
   const [trackInfo, setTrackInfo] = useState<string>('No track selected');
-
-  // State for tasks panel
-  const [tasks, setTasks] = useState<string[]>([]);
-  const [newTask, setNewTask] = useState<string>('');
 
   // State for displaying temporary messages (replaces alert())
   const [message, setMessage] = useState<string>('');
@@ -44,21 +38,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Task controls
-  const handleAddTask = () => {
-    if (newTask.trim()) {
-      setTasks([...tasks, newTask.trim()]);
-      setNewTask('');
-      showMessage('Task added!');
-    } else {
-      showMessage('Please enter a task.');
-    }
-  };
-
-  const handleRemoveTask = (index: number) => {
-    setTasks(tasks.filter((_, i) => i !== index));
-    showMessage('Task removed.');
-  };
 
   // Reusable Button component for consistency
   interface IconButtonProps {
@@ -77,7 +56,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono p-4 sm:p-8 flex flex-col items-center justify-center overflow-hidden relative">
+    <div className="min-h-screen bg-black text-white font-mono p-4 sm:p-8 flex flex-col items-center justify-center overflow-hidden relative custom-scrollbar ${accentColor}">
       {/* Message Display */}
       {message && (
         <div className={`absolute top-4 left-1/2 -translate-x-1/2 bg-gray-900 px-4 py-2 rounded-lg shadow-lg ${accentColor} border border-current z-50`}>
@@ -129,39 +108,7 @@ const App: React.FC = () => {
 
           {/* Bottom Right - Tasks Panel */}
           <div className="p-4 sm:p-6 border-2 rounded-xl border-gray-700 flex flex-col justify-between min-h-[150px] sm:min-h-[200px]">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <input
-                  type="text"
-                  placeholder="Add task..."
-                  value={newTask}
-                  onChange={(e) => setNewTask(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-                  className="flex-grow bg-transparent border-b-2 border-gray-600 focus:outline-none focus:border-current py-1 px-2 text-sm sm:text-base"
-                />
-                <IconButton onClick={handleAddTask} className="p-1">
-                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                </IconButton>
-              </div>
-              {tasks.length === 0 ? (
-                <div className={`text-xs sm:text-sm text-gray-400 ${accentColor}`}>No tasks</div>
-              ) : (
-                <ul className="list-none p-0 m-0">
-                  {tasks.map((task, index) => (
-                    <li key={index} className="flex items-center justify-between py-1 text-sm sm:text-base">
-                      <span className={`${accentColor}`}>{task}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTask(index)}
-                        className={`text-gray-600 hover:${accentColor} text-xs sm:text-sm`}
-                      >
-                        [x]
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <TaskPanel accentColor={accentColor} IconButton={IconButton} />
           </div>
         </div>
       </div>
