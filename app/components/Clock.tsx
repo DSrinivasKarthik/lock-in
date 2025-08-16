@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { getAccentHex } from '../utils/colors';
 
 interface ClockProps {
   accentColor: string; // We'll pass accent color from parent
@@ -37,10 +38,11 @@ const Clock: React.FC<ClockProps> = ({ accentColor }) => {
 
   return (
     <div className="col-span-1 md:col-span-full flex flex-col items-center justify-center py-4 sm:py-8">
-      <div className={`text-7xl sm:text-9xl font-bold ${accentColor}`}>
+      <div className="text-7xl sm:text-9xl font-bold"
+      style={{ color: getAccentHex(accentColor),  }} >
         {formatTime(currentTime)}
       </div>
-      <div className={`text-xl sm:text-2xl mt-2 sm:mt-4 ${accentColor}`}>
+      <div className= "text-xl sm:text-2xl mt-2 sm:mt-4 " style={{ color: getAccentHex(accentColor) }} >
         {formatDate(currentTime)}
       </div>
     </div>

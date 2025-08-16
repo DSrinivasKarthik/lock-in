@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipForward, SkipBack, Volume2, Settings } from 'lucide-react';
+import { getAccentHex } from '../utils/colors';
 
 interface FocusTimerProps {
   accentColor: string;
@@ -61,10 +62,12 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ accentColor, showMessage, IconB
   return (
     <div className="col-span-1 md:col-span-full p-4 sm:p-6 border-2 rounded-xl border-gray-700 flex flex-col justify-between min-h-[150px] sm:min-h-[200px]">
       <div className="flex-grow flex flex-col items-center justify-center">
-        <div className={`text-5xl sm:text-7xl font-bold ${accentColor}`}>
+        <div className="text-5xl sm:text-7xl font-bold"
+              style={{ color: getAccentHex(accentColor),  }} >
           {formatTimer(focusTime)}
         </div>
-        <div className={`text-lg sm:text-xl mt-2 ${accentColor}`}>FOCUS</div>
+        <div className="text-lg sm:text-xl mt-2"
+                      style={{ color: getAccentHex(accentColor),  }} >FOCUS</div>
       </div>
       <div className="flex justify-center space-x-2 sm:space-x-4 mt-4">
         <IconButton onClick={() => showMessage('Skip back not implemented for timer.')} className="opacity-50 cursor-not-allowed">
