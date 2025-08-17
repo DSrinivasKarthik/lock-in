@@ -27,7 +27,7 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ accentColor, showMessage, IconB
         timerIntervalRef.current = null;
       }
     };
-  }, [isTimerRunning]);
+  }, [isTimerRunning, focusTime]);
 
   // When timer hits zero
   useEffect(() => {
@@ -39,7 +39,7 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ accentColor, showMessage, IconB
       }
       showMessage('Focus session complete!');
     }
-  }, [focusTime]);
+  }, [focusTime, showMessage]);
 
   // Format time (MM:SS)
   const formatTimer = (seconds: number) => {
@@ -56,7 +56,7 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ accentColor, showMessage, IconB
   const resetTimer = () => {
     setIsTimerRunning(false);
     setFocusTime(25 * 60); // Reset to 25 minutes
-    showMessage('Timer reset to 50 minutes.');
+    showMessage('Timer reset to 25 minutes.');
   };
 
   return (

@@ -3,14 +3,41 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Plus, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Eye, EyeOff, 
-  Trash, Shuffle, Repeat, Heart, Clock
-} from 'lucide-react';
+  Shuffle, Repeat, Heart} from 'lucide-react';
+
+// Add YT namespace type for TypeScript
+declare global {
+  interface Window {
+    YT?: { Player: new (element: HTMLElement | string, options: object) => YTPlayer };
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
+interface YTPlayer {
+  destroy(): void;
+  getVideoData(): { video_id: string };
+  getCurrentTime(): number;
+  getDuration(): number;
+  pauseVideo(): void;
+  playVideo(): void;
+  seekTo(time: number, allowSeekAhead?: boolean): void;
+  mute(): void;
+  unMute(): void;
+  setVolume(volume: number): void;
+  getIframe(): HTMLIFrameElement;
+}
+
+const YTPlayerState = {
+  ENDED: 0,
+  PLAYING: 1,
+  PAUSED: 2,
+  BUFFERING: 3,
+  CUED: 5
+} as const;
 
 interface MusicPanelProps {
   youtubeUrl: string;
   setYoutubeUrl: React.Dispatch<React.SetStateAction<string>>;
-  trackInfo: string;
-  handleAddTrack: () => void;
   showMessage: (msg: string) => void;
   accentColor: string;
   IconButton: React.FC<{ children: React.ReactNode; onClick: () => void; className?: string }>;
@@ -59,15 +86,12 @@ const fetchVideoTitle = async (videoId: string): Promise<string> => {
 const MusicPanel: React.FC<MusicPanelProps> = ({ 
   youtubeUrl, 
   setYoutubeUrl, 
-  trackInfo, 
-  handleAddTrack: originalHandleAddTrack, 
   showMessage, 
   accentColor, 
   IconButton 
 }) => {
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrack, setCurrentTrack] = useState<number | null>(null);
-  const [error, setError] = useState('');
   const [showVideo, setShowVideo] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
@@ -81,10 +105,32 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [isAddingTrack, setIsAddingTrack] = useState(false);
   
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<YTPlayer | null>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const volumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const loadTrack = useCallback((index: number) => {
+    if (playlist[index] && index !== currentTrack) {
+      setCurrentTrack(index);
+    }
+  }, [playlist, currentTrack]);
+
+  const handleNext = useCallback(() => {
+    if (repeatMode === 'one' && currentTrack !== null) {
+      if (playerRef.current) {
+        playerRef.current.seekTo(0);
+        playerRef.current.playVideo();
+      }
+      return;
+    }
+
+    if (currentTrack !== null && currentTrack < playlist.length - 1) {
+      loadTrack(currentTrack + 1);
+    } else if (playlist.length > 0 && repeatMode === 'all') {
+      loadTrack(0);
+    }
+  }, [repeatMode, currentTrack, playlist, loadTrack]);
 
   // Enhanced tab volume control that actually works
   const applyTabVolume = useCallback(() => {
@@ -99,31 +145,31 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
     const applyVolumeToElements = () => {
       // Get all video and audio elements
       const mediaElements = [
-        ...document.querySelectorAll('video'),
-        ...document.querySelectorAll('audio'),
-        ...document.querySelectorAll('iframe[src*="youtube"]')
+        ...Array.from(document.querySelectorAll('video')) as HTMLVideoElement[],
+        ...Array.from(document.querySelectorAll('audio')) as HTMLAudioElement[],
+        ...Array.from(document.querySelectorAll('iframe[src*="youtube"]')) as HTMLIFrameElement[],
       ];
       
-      mediaElements.forEach((element: any) => {
+      mediaElements.forEach((element) => {
         if (element.tagName === 'IFRAME') {
           // For YouTube iframes, we'll use postMessage
           try {
-            element.contentWindow?.postMessage(
+            (element as HTMLIFrameElement).contentWindow?.postMessage(
               `{"event":"command","func":"setVolume","args":[${actualVolume * 100}]}`,
               '*'
             );
-          } catch (e) {
+          } catch {
             // Fallback: try to find video elements inside iframe
-            const videos = element.contentDocument?.querySelectorAll('video') || [];
-            videos.forEach((video: any) => {
+            const videos = (element as HTMLIFrameElement).contentDocument?.querySelectorAll('video') || [];
+            videos.forEach((video) => {
               if (video && typeof video.volume !== 'undefined') {
                 video.volume = actualVolume;
               }
             });
           }
-        } else if (element && typeof element.volume !== 'undefined') {
-          element.volume = actualVolume;
-          element.muted = isMuted;
+        } else if (element && typeof (element as HTMLVideoElement | HTMLAudioElement).volume !== 'undefined') {
+          (element as HTMLVideoElement | HTMLAudioElement).volume = actualVolume;
+          (element as HTMLVideoElement | HTMLAudioElement).muted = isMuted;
         }
       });
     };
@@ -143,8 +189,8 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
           playerRef.current.unMute();
           playerRef.current.setVolume(volume);
         }
-      } catch (e) {
-        console.log('YouTube API volume control not available');
+      } catch {
+        // YouTube API volume control not available
       }
     }
   }, [volume, isMuted]);
@@ -167,7 +213,7 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
             setDuration(total);
             setProgress((current / total) * 100);
           }
-        } catch (e) {
+        } catch {
           // Handle errors silently
         }
       }
@@ -178,13 +224,12 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
 
   // Load YouTube API
   useEffect(() => {
-    if (!(window as any).YT) {
+    if (!window.YT) {
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
       const firstScriptTag = document.getElementsByTagName('script')[0];
       firstScriptTag?.parentNode?.insertBefore(tag, firstScriptTag);
-
-      (window as any).onYouTubeIframeAPIReady = () => {
+      window.onYouTubeIframeAPIReady = () => {
         setPlayerReady(true);
       };
     } else {
@@ -210,7 +255,8 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
           playerRef.current.destroy();
         }
 
-        playerRef.current = new (window as any).YT.Player(playerContainerRef.current, {
+        const winYT = (window as typeof window & { YT: { Player: new (a: HTMLElement, b: object) => YTPlayer } }).YT;
+        playerRef.current = new winYT.Player(playerContainerRef.current as HTMLElement, {
           height: '100%',
           width: '100%',
           videoId: newVideoId,
@@ -223,7 +269,7 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
             iv_load_policy: 3
           },
           events: {
-            onReady: (event: any) => {
+            onReady: (event: { target: YTPlayer }) => {
               setIsPlaying(true);
               applyTabVolume();
               // Set video visibility
@@ -231,18 +277,17 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
                 event.target.getIframe().style.opacity = '0';
               }
             },
-            onStateChange: (event: any) => {
-              const YT = (window as any).YT;
-              if (event.data === YT.PlayerState.ENDED) {
+            onStateChange: (event: { data: number }) => {
+              if (event.data === YTPlayerState.ENDED) {
                 handleNext();
               }
-              setIsPlaying(event.data === YT.PlayerState.PLAYING);
+              setIsPlaying(event.data === YTPlayerState.PLAYING);
             }
           }
         });
       }
     }
-  }, [playerReady, currentTrack, playlist.length, isAddingTrack]); // Removed playlist dependency
+  }, [playerReady, currentTrack, playlist, isAddingTrack, showVideo, applyTabVolume, handleNext]);
 
   // Handle video visibility - FIXED
   useEffect(() => {
@@ -264,20 +309,17 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
     if (isAddingTrack) return; // Prevent multiple simultaneous additions
     
     if (!isValidYouTubeUrl(youtubeUrl)) {
-      setError('Please enter a valid YouTube URL.');
       showMessage('Please enter a valid YouTube URL.');
       return;
     }
 
     const id = extractVideoId(youtubeUrl);
     if (!id) {
-      setError('Could not extract video ID.');
       showMessage('Could not extract video ID.');
       return;
     }
 
     if (playlist.some((track) => track.id === id)) {
-      setError('This video is already in the playlist.');
       showMessage('This video is already in the playlist.');
       return;
     }
@@ -293,7 +335,6 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
 
     const newPlaylistLength = playlist.length;
     setPlaylist(prev => [...prev, newTrack]);
-    setError('');
 
     // Only set as current track if no track is currently playing
     if (currentTrack === null) {
@@ -349,33 +390,11 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
     showMessage('Track removed from playlist.');
   };
 
-  const loadTrack = (index: number) => {
-    if (playlist[index] && index !== currentTrack) {
-      setCurrentTrack(index);
-    }
-  };
-
   const handlePrev = () => {
     if (currentTrack !== null && currentTrack > 0) {
       loadTrack(currentTrack - 1);
     } else if (playlist.length > 0) {
       loadTrack(playlist.length - 1);
-    }
-  };
-
-  const handleNext = () => {
-    if (repeatMode === 'one' && currentTrack !== null) {
-      if (playerRef.current) {
-        playerRef.current.seekTo(0);
-        playerRef.current.playVideo();
-      }
-      return;
-    }
-
-    if (currentTrack !== null && currentTrack < playlist.length - 1) {
-      loadTrack(currentTrack + 1);
-    } else if (playlist.length > 0 && repeatMode === 'all') {
-      loadTrack(0);
     }
   };
 
@@ -481,8 +500,6 @@ const MusicPanel: React.FC<MusicPanelProps> = ({
           <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
         </IconButton>
       </div>
-
-      {error && <p className="text-red-500 text-xs sm:text-sm mb-2">{error}</p>}
 
       {/* Current Track Info */}
       {currentTrack !== null && playlist[currentTrack] && (

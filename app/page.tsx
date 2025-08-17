@@ -14,7 +14,6 @@ const App: React.FC = () => {
 
   // State for music panel
   const [youtubeUrl, setYoutubeUrl] = useState<string>('');
-  const [trackInfo, setTrackInfo] = useState<string>('No track selected');
 
   // State for displaying temporary messages (replaces alert())
   const [message, setMessage] = useState<string>('');
@@ -25,17 +24,6 @@ const App: React.FC = () => {
     setTimeout(() => {
       setMessage('');
     }, 3000); // Message disappears after 3 seconds
-  };
-
-  // Music controls (placeholder functions)
-  const handleAddTrack = () => {
-    if (youtubeUrl.trim()) {
-      setTrackInfo(`a YouTube [${youtubeUrl.substring(0, 20)}...]`);
-      setYoutubeUrl('');
-      showMessage('Track added!');
-    } else {
-      showMessage('Please enter a YouTube URL.');
-    }
   };
 
   // Reusable Button component for consistency
@@ -121,7 +109,7 @@ const App: React.FC = () => {
           {message}
         </div>
       )}
-      {/* Cyberpunk Theme Selector - Improved with Neon Glyph */}
+      {/* Cyberpunk Theme Selector */}
       <div className="absolute top-4 sm:top-6 right-4 sm:right-8 z-10">
         <div className="relative group/theme">
           {/* Hexagonal Trigger Button */}
@@ -193,7 +181,7 @@ const App: React.FC = () => {
 
               {/* Color Grid - 4 columns, responsive */}
               <div className="grid grid-cols-4 gap-3 mb-4">
-                {colors.map((color, index) => (
+                {colors.map((color) => (
                   <button
                     key={color.name}
                     type="button"
@@ -313,8 +301,6 @@ const App: React.FC = () => {
           <MusicPanel
             youtubeUrl={youtubeUrl}
             setYoutubeUrl={setYoutubeUrl}
-            trackInfo={trackInfo}
-            handleAddTrack={handleAddTrack}
             showMessage={showMessage}
             accentColor={accentColor}
             IconButton={IconButton}
