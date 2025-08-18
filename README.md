@@ -5,7 +5,7 @@ Lock-In is a modern productivity dashboard built with Next.js and React, featuri
 ## Features
 
 - **Clock & Date**: Real-time display of current time and date.
-- **Focus Timer**: Adjustable 50-minute timer with start/pause/reset controls and session completion notification.
+- **Focus Timer**: Adjustable 25-minute timer with start/pause/reset controls and session completion notification.
 - **Music Panel**: Add YouTube music tracks (URL only, playback not implemented yet), with placeholder controls for play/pause, skip, and volume.
 - **Task Panel**: Add and remove tasks, with instant feedback and a clean list view.
 - **Accent Color Selector**: Choose from several neon accent colors to customize the interface.
@@ -67,10 +67,8 @@ lock-in/
 - **Focus Timer**: Adjust timer duration in `page.tsx` if needed.
 
 ## Limitations & Roadmap
-- Music playback is not implemented; only track info is stored.
-- Timer skip and music controls are placeholders.
 - No persistent storage for tasks or tracks.
-- Planned features: YouTube playback integration, persistent storage, advanced settings.
+- Controls in Focus Timer not implemented.
 
 ## License
 MIT
